@@ -1,0 +1,10 @@
+{
+  "name": "Retail Sales Prediction System",
+  "description": "An AI-powered retail sales forecasting platform that uses Big Data to optimize inventory and business intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "Sales Forecasting",
+    "Inventory Optimization",
+    "Business Intelligence"
+  ]
+}
