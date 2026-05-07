@@ -15,9 +15,10 @@ export default function Predict() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{ id: string; value: number } | null>(null);
 
-  const [history, setHistory] = useState([
-    { id: '69b4f0b5e61e10d3c1ce2cac', context: { s: 7, i: 3, month: 'Any' }, value: 420 }
-  ]);
+  const [history, setHistory] = useState<{ id: string; context: { s: number; i: number; month: string }; value: number; date: string }[]>(() => {
+    const saved = localStorage.getItem('prediction_history');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,19 +38,23 @@ export default function Predict() {
       
       const newId = Math.random().toString(16).substring(2, 26);
       const newResult = { id: newId, value: newValue };
+      const newHistoryItem = { 
+        id: newId, 
+        context: { 
+          s: parseInt(formData.store) || 1, 
+          i: parseInt(formData.item) || 1, 
+          month: formData.month === '-- No Month --' ? 'Any' : formData.month 
+        }, 
+        value: newValue,
+        date: new Date().toLocaleString()
+      };
+
       setResult(newResult);
-      setHistory(prev => [
-        { 
-          id: newId, 
-          context: { 
-            s: parseInt(formData.store) || 1, 
-            i: parseInt(formData.item) || 1, 
-            month: formData.month === '-- No Month --' ? 'Any' : formData.month 
-          }, 
-          value: newValue 
-        },
-        ...prev
-      ]);
+      setHistory(prev => {
+        const updated = [newHistoryItem, ...prev];
+        localStorage.setItem('prediction_history', JSON.stringify(updated));
+        return updated;
+      });
       setIsLoading(false);
     }, 1500);
   };
@@ -183,50 +188,52 @@ export default function Predict() {
           )}
         </AnimatePresence>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100">
-            <h2 className="text-xl font-bold text-gray-900">My Private Prediction History</h2>
-            <p className="text-sm text-gray-400">Your personal history of forecasts and intelligence reports</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[600px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Prediction ID</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Context</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Predicted Value</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {history.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 text-center">
-                      <span className="text-blue-500 text-xs font-medium hover:underline cursor-pointer">{item.id}</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="inline-flex flex-col items-center">
-                        <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded font-bold mb-1">S: {item.context.s} | I: {item.context.i}</span>
-                        <span className="text-[10px] text-gray-500">Month: {item.context.month}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="text-lg font-bold text-[#007AFF]">{item.value}</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={() => navigate('/feedback')}
-                        className="text-[10px] font-bold border border-blue-500 text-blue-500 px-3 py-1 rounded hover:bg-blue-500 hover:text-white transition-colors"
-                      >
-                        Feedback
-                      </button>
-                    </td>
+        {history.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900">My Private Prediction History</h2>
+              <p className="text-sm text-gray-400">Your personal history of forecasts and intelligence reports</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left min-w-[600px]">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Prediction ID</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Context</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Predicted Value</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {history.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-blue-500 text-xs font-medium hover:underline cursor-pointer">{item.id}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="inline-flex flex-col items-center">
+                          <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded font-bold mb-1">S: {item.context.s} | I: {item.context.i}</span>
+                          <span className="text-[10px] text-gray-500">Month: {item.context.month}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-lg font-bold text-[#007AFF]">{item.value}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button 
+                          onClick={() => navigate('/feedback')}
+                          className="text-[10px] font-bold border border-blue-500 text-blue-500 px-3 py-1 rounded hover:bg-blue-500 hover:text-white transition-colors"
+                        >
+                          Feedback
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
