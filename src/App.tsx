@@ -58,20 +58,27 @@ function HomePage({ isLoggedIn, showSuccess, setShowSuccess }: {
 }
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ email: string; name: string } | null>(() => {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const handleLogin = () => {
-    setIsLoggedIn(true);
+  const handleLogin = (user: { email: string; name: string }) => {
+    setCurrentUser(user);
+    localStorage.setItem('user', JSON.stringify(user));
     setShowSuccess(true);
     // Auto hide after 5 seconds
     setTimeout(() => setShowSuccess(false), 5000);
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
+    setCurrentUser(null);
+    localStorage.removeItem('user');
     setShowSuccess(false);
   };
+
+  const isLoggedIn = !!currentUser;
 
   return (
     <Router>
@@ -87,10 +94,10 @@ export default function App() {
           } />
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/register" element={<Register onRegister={handleLogin} />} />
-          <Route path="/predict" element={<Predict />} />
+          <Route path="/predict" element={<Predict currentUser={currentUser} />} />
           <Route path="/metrics" element={<ModelMetrics />} />
           <Route path="/inventory" element={<Inventory />} />
-          <Route path="/feedback" element={<Feedback />} />
+          <Route path="/feedback" element={<Feedback currentUser={currentUser} />} />
           <Route path="/about" element={<About />} />
         </Routes>
       </div>

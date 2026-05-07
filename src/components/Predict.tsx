@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, Calendar, Hash, ChevronDown, Loader2, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export default function Predict() {
+export default function Predict({ currentUser }: { currentUser: { email: string; name: string } | null }) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     store: '',
@@ -15,46 +15,85 @@ export default function Predict() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{ id: string; value: number } | null>(null);
 
-  const [history, setHistory] = useState<{ id: string; context: { s: number; i: number; month: string }; value: number; date: string }[]>(() => {
-    const saved = localStorage.getItem('prediction_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [history, setHistory] = useState<{ id: string; context: { s: number; i: number; month: string }; value: number; date: string }[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  React.useEffect(() => {
+    if (!currentUser) {
+      setIsInitialLoading(false);
+      return;
+    }
+
+    fetch(`/api/predictions?email=${encodeURIComponent(currentUser.email)}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch predictions');
+        return res.json();
+      })
+      .then(data => {
+        if (Array.isArray(data)) {
+          setHistory(data.map((item: any) => ({
+            id: item.predictionId || item._id,
+            context: item.context || { s: 0, i: 0, month: 'Unknown' },
+            value: item.value || 0,
+            date: new Date(item.date).toLocaleString()
+          })));
+        }
+      })
+      .catch(err => console.error('Failed to fetch history:', err))
+      .finally(() => setIsInitialLoading(false));
+  }, [currentUser]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentUser) {
+      alert("Please login to make a prediction");
+      return;
+    }
+
     setIsLoading(true);
     setResult(null);
 
     // Simulate AI model inference
-    setTimeout(() => {
+    setTimeout(async () => {
       const storeNum = parseInt(formData.store) || 1;
       const itemNum = parseInt(formData.item) || 1;
       
-      // Deterministic pseudo-random generation to simulate a "trained model"
-      // Same inputs will now give consistent, unique outputs
       const baseValue = (storeNum * 13 + itemNum * 7) % 500 + 200;
       const seasonalMultiplier = formData.month !== '-- No Month --' ? 1.2 : 1.0;
       const newValue = Math.floor(baseValue * seasonalMultiplier);
       
       const newId = Math.random().toString(16).substring(2, 26);
-      const newResult = { id: newId, value: newValue };
-      const newHistoryItem = { 
-        id: newId, 
+      const predictionData = { 
+        email: currentUser.email,
+        predictionId: newId, 
         context: { 
           s: parseInt(formData.store) || 1, 
           i: parseInt(formData.item) || 1, 
           month: formData.month === '-- No Month --' ? 'Any' : formData.month 
         }, 
-        value: newValue,
-        date: new Date().toLocaleString()
+        value: newValue 
       };
 
-      setResult(newResult);
-      setHistory(prev => {
-        const updated = [newHistoryItem, ...prev];
-        localStorage.setItem('prediction_history', JSON.stringify(updated));
-        return updated;
-      });
+      try {
+        await fetch('/api/predictions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(predictionData)
+        });
+        
+        setResult({ id: newId, value: newValue });
+        setHistory(prev => [
+          { 
+            id: newId, 
+            context: predictionData.context, 
+            value: newValue,
+            date: new Date().toLocaleString()
+          },
+          ...prev
+        ]);
+      } catch (err) {
+        console.error('Failed to save prediction:', err);
+      }
       setIsLoading(false);
     }, 1500);
   };

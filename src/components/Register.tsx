@@ -4,7 +4,7 @@ import { TrendingUp, Mail, Lock, User, Eye, EyeOff, Loader2, CheckCircle2 } from
 import { motion } from 'motion/react';
 
 interface RegisterProps {
-  onRegister: () => void;
+  onRegister: (user: { email: string; name: string }) => void;
 }
 
 export default function Register({ onRegister }: RegisterProps) {
@@ -12,15 +12,43 @@ export default function Register({ onRegister }: RegisterProps) {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: FormEvent) => {
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setError(null);
     setIsLoading(true);
-    // Simulate registration
-    setTimeout(() => {
+    
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const firstName = formData.get('first-name');
+    const lastName = formData.get('last-name');
+    const email = formData.get('email');
+    const password = formData.get('password');
+
+    try {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email, 
+          password, 
+          name: `${firstName} ${lastName}` 
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        onRegister(data.user);
+        navigate('/');
+      } else {
+        setError(data.error || 'Registration failed');
+      }
+    } catch (err) {
+      setError('Connection error. Please try again later.');
+    } finally {
       setIsLoading(false);
-      onRegister();
-      navigate('/');
-    }, 1500);
+    }
   };
 
   return (
@@ -54,6 +82,11 @@ export default function Register({ onRegister }: RegisterProps) {
         className="mt-8 sm:mx-auto sm:w-full sm:max-w-md"
       >
         <div className="bg-white py-8 px-4 shadow-xl shadow-blue-500/5 sm:rounded-2xl sm:px-10 border border-gray-100">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg text-center font-medium">
+              {error}
+            </div>
+          )}
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="grid grid-cols-2 gap-4">
               <div>

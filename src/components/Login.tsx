@@ -4,7 +4,7 @@ import { TrendingUp, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface LoginProps {
-  onLogin: () => void;
+  onLogin: (user: { email: string; name: string }) => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
@@ -12,15 +12,37 @@ export default function Login({ onLogin }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: FormEvent) => {
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setError(null);
     setIsLoading(true);
-    // Simulate login
-    setTimeout(() => {
+    
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const email = formData.get('email');
+    const password = formData.get('password');
+
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        onLogin(data.user);
+        navigate('/');
+      } else {
+        setError(data.error || 'Login failed');
+      }
+    } catch (err) {
+      setError('Connection error. Please check if the server is running.');
+    } finally {
       setIsLoading(false);
-      onLogin();
-      navigate('/');
-    }, 1500);
+    }
   };
 
   return (
@@ -54,6 +76,11 @@ export default function Login({ onLogin }: LoginProps) {
         className="mt-8 sm:mx-auto sm:w-full sm:max-w-md"
       >
         <div className="bg-white py-8 px-4 shadow-xl shadow-blue-500/5 sm:rounded-2xl sm:px-10 border border-gray-100">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg text-center font-medium">
+              {error}
+            </div>
+          )}
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="email" className="block text-sm font-semibold text-gray-700">

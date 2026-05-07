@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Loader2, BrainCircuit, RefreshCw } from 'lucide-react';
 
-export default function Feedback() {
-  const [feedbackCount, setFeedbackCount] = useState(() => {
-    const saved = localStorage.getItem('feedback_count');
-    return saved ? parseInt(saved) : 0;
-  });
+export default function Feedback({ currentUser }: { currentUser: { email: string; name: string } | null }) {
+  const [feedbackCount, setFeedbackCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTraining, setIsTraining] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -15,8 +12,56 @@ export default function Feedback() {
     notes: ''
   });
 
+  const [feedbackList, setFeedbackList] = useState<{ key: string; predicted: number; actual: number; diff: number; status: string }[]>([]);
+  const [recentPredictions, setRecentPredictions] = useState<{ id: string; date: string; store: number; item: number }[]>([]);
+
   useEffect(() => {
-    localStorage.setItem('feedback_count', feedbackCount.toString());
+    // Fetch initial data
+    const fetchData = async () => {
+      try {
+        const emailQuery = currentUser ? `?email=${encodeURIComponent(currentUser.email)}` : '';
+        
+        const [predRes, feedbackRes, countRes] = await Promise.all([
+          fetch(`/api/predictions${emailQuery}`),
+          fetch(`/api/feedback${emailQuery}`),
+          fetch('/api/feedback/count')
+        ]);
+        
+        const predData = await predRes.json();
+        const feedbackData = await feedbackRes.json();
+        const { count } = await countRes.json();
+
+        if (Array.isArray(predData)) {
+          setRecentPredictions(predData.map((item: any) => ({
+            id: item.predictionId || item._id,
+            date: new Date(item.date).toLocaleString(),
+            store: item.context?.s || 0,
+            item: item.context?.i || 0
+          })));
+        }
+
+        if (Array.isArray(feedbackData)) {
+          setFeedbackList(feedbackData.map((item: any) => {
+            return {
+              key: item.notes || 'Feedback',
+              predicted: 0,
+              actual: item.actualSales || 0,
+              diff: 0,
+              status: 'Stored'
+            };
+          }));
+        }
+        
+        setFeedbackCount(count);
+      } catch (err) {
+        console.error('Failed to fetch data:', err);
+      }
+    };
+
+    fetchData();
+  }, [currentUser]);
+
+  useEffect(() => {
     if (feedbackCount >= 100) {
       setIsTraining(true);
     }
@@ -26,61 +71,66 @@ export default function Feedback() {
     setIsTraining(true);
     // Simulate training process
     setTimeout(() => {
-      setFeedbackCount(0);
+      // In a real app we might want to tell the server to reset something
       setIsTraining(false);
       window.location.reload(); // Refresh the app as requested
     }, 3000);
   };
 
-  const [feedbackList, setFeedbackList] = useState<{ key: string; predicted: number; actual: number; diff: number; status: string }[]>(() => {
-    const saved = localStorage.getItem('feedback_data');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [recentPredictions, setRecentPredictions] = useState<{ id: string; date: string; store: number; item: number }[]>(() => {
-    const saved = localStorage.getItem('prediction_history');
-    const history = saved ? JSON.parse(saved) : [];
-    return history.map((item: any) => ({
-      id: item.id,
-      date: item.date,
-      store: item.context.s,
-      item: item.context.i
-    }));
-  });
-
-  useEffect(() => {
-    localStorage.setItem('feedback_data', JSON.stringify(feedbackList));
-  }, [feedbackList]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentUser) {
+      alert("Please login to submit feedback");
+      return;
+    }
     if (!formData.predictionId || !formData.actualSales) return;
 
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      const actual = parseFloat(formData.actualSales);
-      
-      // Find the prediction in history to get context and predicted value
-      const savedHistory = localStorage.getItem('prediction_history');
-      const history = savedHistory ? JSON.parse(savedHistory) : [];
-      const prediction = history.find((p: any) => p.id === formData.predictionId);
-      
-      const predicted = prediction ? prediction.value : 0;
-      const diff = Math.abs(predicted - actual);
-      const status = diff < 5 ? 'Accurate' : 'Variance';
-      const key = prediction ? `S: ${prediction.context.s} | I: ${prediction.context.i}` : 'Unknown';
+    // API call
+    setTimeout(async () => {
+      try {
+        const actual = parseFloat(formData.actualSales);
+        
+        const response = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: currentUser.email,
+            predictionId: formData.predictionId,
+            actualSales: actual,
+            notes: formData.notes
+          })
+        });
 
-      const newFeedback = { key, predicted, actual, diff, status };
-      
-      setFeedbackList(prev => [newFeedback, ...prev]);
-      setFeedbackCount(prev => prev + 1);
+        if (response.ok) {
+          // Re-fetch count to show global progress
+          const countRes = await fetch('/api/feedback/count');
+          const { count } = await countRes.json();
+          setFeedbackCount(count);
+
+          setShowSuccess(true);
+          setFormData({ predictionId: '', actualSales: '', notes: '' });
+          setTimeout(() => setShowSuccess(false), 3000);
+          
+          // Refresh list
+          const emailQuery = `?email=${encodeURIComponent(currentUser.email)}`;
+          const feedbackRes = await fetch(`/api/feedback${emailQuery}`);
+          const feedbackData = await feedbackRes.json();
+          if (Array.isArray(feedbackData)) {
+            setFeedbackList(feedbackData.map((item: any) => ({
+              key: item.notes || 'Feedback',
+              predicted: 0,
+              actual: item.actualSales || 0,
+              diff: 0,
+              status: 'Stored'
+            })));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to submit feedback:', err);
+      }
       setIsSubmitting(false);
-      setShowSuccess(true);
-      setFormData({ predictionId: '', actualSales: '', notes: '' });
-      
-      setTimeout(() => setShowSuccess(false), 3000);
     }, 1000);
   };
 
