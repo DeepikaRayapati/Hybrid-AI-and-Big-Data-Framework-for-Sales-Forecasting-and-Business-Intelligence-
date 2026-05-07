@@ -30,7 +30,15 @@ export default function Login({ onLogin }: LoginProps) {
         body: JSON.stringify({ email, password })
       });
 
-      const data = await response.json();
+      let data;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error("Non-JSON response:", text);
+        throw new Error("Server returned non-JSON response. Ensure you are running as a Web Service on Render.");
+      }
 
       if (response.ok) {
         onLogin(data.user);
@@ -39,7 +47,8 @@ export default function Login({ onLogin }: LoginProps) {
         setError(data.error || 'Login failed');
       }
     } catch (err) {
-      setError('Connection error. Please check if the server is running.');
+      console.error("Login fetch error:", err);
+      setError(err instanceof Error ? err.message : 'Connection error. Please check if the server is running.');
     } finally {
       setIsLoading(false);
     }

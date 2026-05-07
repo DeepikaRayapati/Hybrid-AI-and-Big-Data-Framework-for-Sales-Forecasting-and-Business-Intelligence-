@@ -11,6 +11,10 @@ const PORT = Number(process.env.PORT) || 3000;
 
 // Middleware
 app.use(express.json());
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
 
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI;

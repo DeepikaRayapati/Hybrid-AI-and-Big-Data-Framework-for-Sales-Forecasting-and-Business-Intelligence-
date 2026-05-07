@@ -15,8 +15,43 @@ import ModelMetrics from './components/ModelMetrics';
 import Inventory from './components/Inventory';
 import Feedback from './components/Feedback';
 import About from './components/About';
-import { X } from 'lucide-react';
+import { X, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useEffect } from 'react';
+
+function DatabaseStatus() {
+  const [dbStatus, setDbStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading');
+
+  useEffect(() => {
+    const checkDb = async () => {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        setDbStatus(data.database === 'connected' ? 'connected' : 'disconnected');
+      } catch (err) {
+        setDbStatus('disconnected');
+      }
+    };
+    checkDb();
+    const interval = setInterval(checkDb, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50">
+      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg border ${
+        dbStatus === 'connected' 
+          ? 'bg-green-50 text-green-700 border-green-200' 
+          : dbStatus === 'loading'
+            ? 'bg-blue-50 text-blue-700 border-blue-200'
+            : 'bg-red-50 text-red-700 border-red-200'
+      }`}>
+        <Database size={14} className={dbStatus === 'loading' ? 'animate-pulse' : ''} />
+        <span>DB: {dbStatus === 'connected' ? 'Connected' : dbStatus === 'loading' ? 'Checking...' : 'Disconnected'}</span>
+      </div>
+    </div>
+  );
+}
 
 function HomePage({ isLoggedIn, showSuccess, setShowSuccess }: { 
   isLoggedIn: boolean, 
@@ -84,6 +119,7 @@ export default function App() {
     <Router>
       <div className="min-h-screen bg-white">
         <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} />
+        <DatabaseStatus />
         <Routes>
           <Route path="/" element={
             <HomePage 
